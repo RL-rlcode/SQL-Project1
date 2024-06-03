@@ -1,0 +1,260 @@
+use portfolio_project;
+show tables;
+ALTER TABLE walmart_sales MODIFY COLUMN Date DATE;
+set SQL_SAFE_UPDATES = 0;
+UPDATE walmart_sales
+SET Date = STR_TO_DATE(Date, '%d-%m-%Y')
+WHERE Date LIKE '__-__-____';
+ALTER TABLE walmart_sales
+RENAME COLUMN Date to Starting_date_of_salesweek;
+SET sql_mode=(SELECT REPLACE(@@sql_mode,'ONLY_FULL_GROUP_BY',''));
+
+
+-- kpi 1 :how many years data is analaysed?
+select distinct(year(Starting_date_of_salesweek)) from walmart_sales;
+-- ans : 3
+
+
+-- kpi 2 :how many stores are analysed?
+select count(distinct(store)) from walmart_sales;
+-- ans : 45
+
+-- kpi 3 :what was the maximum sales in a week?
+select max(weekly_sales) from walmart_sales;
+-- ans : 3818686.45
+
+-- kpi 4 :which store has the maximum sales?
+select store, sum(weekly_sales) as total_sales
+from walmart_sales
+group by store
+order by total_sales desc
+limit 1;
+-- ans : 20
+
+-- kpi 5 :top performing stores by sales
+select store
+from walmart_sales
+group by store
+order by sum(weekly_sales) desc
+limit 5;
+-- ans : 20, 4, 14, 13, 2
+
+-- kpi 6 :which year has the maximum sales?
+select year(starting_date_of_salesweek), sum(weekly_sales) as total_sales
+from walmart_sales
+group by store
+order by total_sales desc
+limit 1;
+-- ans : 2010
+
+-- temperature max and min
+select max(temperature) as max_temp, min(temperature) as min_temp from walmart_sales;
+-- ans : max = 100.14 , min = -2.06
+
+-- kpi 7 :understanding the relationship between sales and temperature
+SELECT
+    (
+        (COUNT(*) * SUM(temperature * weekly_sales)) - (SUM(temperature) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(temperature * temperature)) - (SUM(temperature) * SUM(temperature)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient
+FROM
+    walmart_sales;
+-- ans: -0.06381001317946293 indicates a weak negative correlation
+
+-- kpi 8 : understanding the relationship between sales and fuel price
+SELECT
+    (
+        (COUNT(*) * SUM(fuel_price * weekly_sales)) - (SUM(fuel_price) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(fuel_price * fuel_price)) - (SUM(fuel_price) * SUM(fuel_price)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient
+FROM
+    walmart_sales;
+-- ans : 0.009463786314503278 indicates a weak positive correlation
+
+-- kpi 9 :understanding the relationship between CPI and sales
+SELECT
+    (
+        (COUNT(*) * SUM(CPI * weekly_sales)) - (SUM(CPI) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(CPI * CPI)) - (SUM(CPI) * SUM(CPI)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient
+FROM
+    walmart_sales;
+-- ans : -0.07263416204017244 indicates a weak negative correlation
+
+-- kpi 10 : understanding the relationship between sales and unemployment rate
+SELECT
+    (
+        (COUNT(*) * SUM(unemployment * weekly_sales)) - (SUM(unemployment) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(unemployment * unemployment)) - (SUM(unemployment) * SUM(unemployment)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient
+FROM
+    walmart_sales;
+-- ans : -0.10617608965796825 indicates a weak negative correlation
+
+-- kpi 11 : understanding the relationship between holiday and sales
+SELECT
+    (
+        (COUNT(*) * SUM(holiday_flag * weekly_sales)) - (SUM(holiday_flag) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(holiday_flag * holiday_flag)) - (SUM(holiday_flag) * SUM(holiday_flag)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient
+FROM
+    walmart_sales;
+-- ans: 0.036890968010413944 indicates a weak positive correlation 
+
+-- kpi 12 : sales value over the years
+select year(Starting_date_of_salesweek)as Year, sum(weekly_sales) as total_sales
+from walmart_sales
+group by year(Starting_date_of_salesweek);
+
+-- kpi 13: which year had the most holiday
+select year(Starting_date_of_salesweek)as Year,sum(holiday_flag)as holidays
+from walmart_sales
+group by year(Starting_date_of_salesweek);
+
+
+-- sample code for r squared 1 temp vs sales
+SELECT
+    (
+        (COUNT(*) * SUM(temperature * weekly_sales)) - (SUM(temperature) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(temperature * temperature)) - (SUM(temperature) * SUM(temperature)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient,
+    (
+        (
+            (COUNT(*) * SUM(temperature * weekly_sales)) - (SUM(temperature) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(temperature * temperature)) - (SUM(temperature) * SUM(temperature)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) * (
+        (
+            (COUNT(*) * SUM(temperature * weekly_sales)) - (SUM(temperature) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(temperature * temperature)) - (SUM(temperature) * SUM(temperature)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) AS r_squared
+FROM
+    walmart_sales;
+-- ans : 0.004071717781963233
+
+
+-- sample code for r squared sales vs holiday
+SELECT
+    (
+        (COUNT(*) * SUM(holiday_flag * weekly_sales)) - (SUM(holiday_flag) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(holiday_flag * holiday_flag)) - (SUM(holiday_flag) * SUM(holiday_flag)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient,
+    (
+        (
+            (COUNT(*) * SUM(holiday_flag * weekly_sales)) - (SUM(holiday_flag) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(holiday_flag * holiday_flag)) - (SUM(holiday_flag) * SUM(holiday_flag)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) * (
+        (
+            (COUNT(*) * SUM(holiday_flag * weekly_sales)) - (SUM(holiday_flag) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(holiday_flag * holiday_flag)) - (SUM(holiday_flag) * SUM(holiday_flag)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) AS r_squared
+FROM
+    walmart_sales;
+-- ans : 0.0013609435207453848
+    
+-- sample code for r squared sales vs fuel price
+SELECT
+    (
+        (COUNT(*) * SUM(fuel_price * weekly_sales)) - (SUM(fuel_price) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(fuel_price * fuel_price)) - (SUM(fuel_price) * SUM(fuel_price)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient,
+    (
+        (
+            (COUNT(*) * SUM(fuel_price * weekly_sales)) - (SUM(fuel_price) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(fuel_price * fuel_price)) - (SUM(fuel_price) * SUM(fuel_price)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) * (
+        (
+            (COUNT(*) * SUM(fuel_price * weekly_sales)) - (SUM(fuel_price) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(fuel_price * fuel_price)) - (SUM(fuel_price) * SUM(fuel_price)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) AS r_squared
+FROM
+    walmart_sales;
+-- ans : 0.00008956325140657954
+
+-- sample code for r squared sales vs unemployemnt
+SELECT
+    (
+        (COUNT(*) * SUM(unemployment * weekly_sales)) - (SUM(unemployment) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(unemployment * unemployment)) - (SUM(unemployment) * SUM(unemployment)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient,
+    (
+        (
+            (COUNT(*) * SUM(unemployment * weekly_sales)) - (SUM(unemployment) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(unemployment * unemployment)) - (SUM(unemployment) * SUM(unemployment)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) * (
+        (
+            (COUNT(*) * SUM(unemployment * weekly_sales)) - (SUM(unemployment) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(unemployment * unemployment)) - (SUM(unemployment) * SUM(unemployment)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) AS r_squared
+FROM
+    walmart_sales;
+-- ans : 0.011273362015056913
+
+
+-- sample code for r squared sales vs cpi
+SELECT
+    (
+        (COUNT(*) * SUM(CPI * weekly_sales)) - (SUM(CPI) * SUM(weekly_sales))
+    ) / (
+        SQRT((COUNT(*) * SUM(CPI * CPI)) - (SUM(CPI) * SUM(CPI)))
+        * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+    ) AS correlation_coefficient,
+    (
+        (
+            (COUNT(*) * SUM(CPI * weekly_sales)) - (SUM(CPI) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(CPI * CPI)) - (SUM(CPI) * SUM(CPI)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) * (
+        (
+            (COUNT(*) * SUM(CPI * weekly_sales)) - (SUM(CPI) * SUM(weekly_sales))
+        ) / (
+            SQRT((COUNT(*) * SUM(CPI * CPI)) - (SUM(CPI) * SUM(CPI)))
+            * SQRT((COUNT(*) * SUM(weekly_sales * weekly_sales)) - (SUM(weekly_sales) * SUM(weekly_sales)))
+        )
+    ) AS r_squared
+FROM
+    walmart_sales;
+-- ans : 0.005275721495278027
